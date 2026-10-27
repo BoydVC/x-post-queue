@@ -1,0 +1,37 @@
+{
+  "account": "@chrisalexboyd",
+  "timezone": "America/New_York",
+  "updated_at_et": "2026-10-27T15:16:29-04:00",
+  "items": [
+    {
+      "id": "278634c5-9d50-4e26-ada7-d6437291beeb",
+      "created_at_et": "2026-10-27T15:16:19-04:00",
+      "status": "draft",
+      "kind": "original",
+      "text": "[EXAMPLE] Quick thought: shipping small tools that still require a human Post tap beats fake schedule APIs. — draft for @chrisalexboyd",
+      "in_reply_to": null,
+      "go_live_at_et": "2026-10-27T15:21:19-04:00",
+      "intent_url": "https://x.com/intent/post?text=%5BEXAMPLE%5D%20Quick%20thought%3A%20shipping%20small%20tools%20that%20still%20require%20a%20human%20Post%20tap%20beats%20fake%20schedule%20APIs.%20%E2%80%94%20draft%20for%20%40chrisalexboyd",
+      "approved_at_et": null,
+      "cued_at_et": null,
+      "posted_at_et": null,
+      "source": "tokenmax",
+      "notes": "EXAMPLE seed — replace or skip before real use"
+    },
+    {
+      "id": "8b953faa-a13d-46b3-9660-f02d9f9b94b4",
+      "created_at_et": "2026-10-27T15:16:19-04:00",
+      "status": "draft",
+      "kind": "reply",
+      "text": "[EXAMPLE] Agree — approve once, intent link at the slot, you still hit Post. Never auto-post.",
+      "in_reply_to": "1234567890123456789",
+      "go_live_at_et": "2026-10-27T17:16:19-04:00",
+      "intent_url": "https://x.com/intent/post?text=%5BEXAMPLE%5D%20Agree%20%E2%80%94%20approve%20once%2C%20intent%20link%20at%20the%20slot%2C%20you%20still%20hit%20Post.%20Never%20auto-post.&in_reply_to=1234567890123456789",
+      "approved_at_et": null,
+      "cued_at_et": null,
+      "posted_at_et": null,
+      "source": "x-growth",
+      "notes": "EXAMPLE seed reply — fake in_reply_to id"
+    }
+  ]
+}
