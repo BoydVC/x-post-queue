@@ -10,6 +10,7 @@ import json
 import os
 import re
 import threading
+import urllib.request
 import uuid
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -27,6 +28,19 @@ ET = ZoneInfo("America/New_York")
 ACCOUNT = "@chrisalexboyd"
 STATUSES = ("draft", "approved", "cued", "posted", "skipped")
 KINDS = ("original", "reply")
+TELLS_GATE_URL = os.environ.get("TELLS_GATE_URL", "http://127.0.0.1:4350/check")
+TELLS_GATE_MIN = int(os.environ.get("TELLS_GATE_MIN", "80"))
+
+
+def tells_gate(text: str):
+    """POST the draft to Tells Gate. Returns its report, or None if unreachable (fail open)."""
+    body = json.dumps({"text": text, "min_score": TELLS_GATE_MIN}).encode()
+    req = urllib.request.Request(TELLS_GATE_URL, body, {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=3) as r:
+            return json.load(r)
+    except Exception:
+        return None
 _lock = threading.RLock()
 
 
@@ -411,7 +425,7 @@ async function api(path, opts) {
     headers: { "Content-Type": "application/json" }
   }, opts || {}));
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || r.statusText);
+  if (!r.ok) { const e = new Error(j.error || r.statusText); e.status = r.status; e.body = j; throw e; }
   return j;
 }
 
@@ -440,7 +454,7 @@ function render() {
     const isDue = dueIds.has(it.id);
     const canApprove = it.status === "draft";
     const canCue = it.status === "approved" || it.status === "cued";
-    const canPosted = it.status === "cued" || it.status === "approved";
+    const canPosted = it.status === "cued";
     const canSkip = it.status === "draft" || it.status === "approved" || it.status === "cued";
     return `<article class="item ${isDue ? "due-now" : ""}" data-id="${esc(it.id)}">
       <div class="item-top">
@@ -511,7 +525,19 @@ $("#list").addEventListener("click", async (e) => {
       return;
     }
     if (act === "approve" || act === "skip" || act === "posted") {
-      await api("/api/items/" + id + "/" + act, { method: "POST", body: "{}" });
+      try {
+        await api("/api/items/" + id + "/" + act, { method: "POST", body: "{}" });
+      } catch (err) {
+        if (err.status === 409 && err.body && err.body.error === "tells-gate blocked") {
+          const b = err.body;
+          const list = b.hits.slice(0, 6).map(h => h.rule + " " + h.name + ': "' + h.text.trim().slice(0, 40) + '"').join("\n");
+          const msg = "Tells Gate score " + b.score + " (needs 80).\n\n" + list +
+            "\n\nSuggested rewrite:\n" + b.rewrite + "\n\nOK = approve this draft anyway. Cancel = go edit it.";
+          if (confirm(msg)) {
+            await api("/api/items/" + id + "/approve", { method: "POST", body: JSON.stringify({ force: true }) });
+          }
+        } else { throw err; }
+      }
       await refresh();
     }
   } catch (err) {
@@ -692,6 +718,20 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
         body = self._read_json()
+        # Tells Gate is a network call, so run it before taking the queue lock.
+        # The locked handler reuses the result only if the text is unchanged.
+        pre_gate = None
+        m = re.fullmatch(r"/api/items/([0-9a-fA-F-]{36})/approve", path)
+        if m:
+            it = find_item(load_queue(), m.group(1))
+            if it:
+                pre_gate = (it["text"], tells_gate(it["text"]))
+        # Hold one lock across load, status check, and save, so a request that read
+        # an older copy can never save over a newer edit (RevokeSticks).
+        with _lock:
+            return self._post_locked(path, body, pre_gate)
+
+    def _post_locked(self, path: str, body: dict, pre_gate):
 
         # POST /api/items — create
         if path == "/api/items":
@@ -780,10 +820,24 @@ class Handler(BaseHTTPRequestHandler):
             if action == "approve":
                 if it["status"] not in ("draft", "approved"):
                     return self._json(400, {"error": f"cannot approve from status={it['status']}"})
+                force = body.get("force") is True
+                gate = pre_gate[1] if pre_gate and pre_gate[0] == it["text"] else tells_gate(it["text"])
+                if gate is None:
+                    it["notes"] = ((it.get("notes") or "") + " [tells-gate unreachable; approved unchecked]").strip()
+                else:
+                    it["tells_score"] = gate["score"]
+                    it["tells_hits"] = [f'{h["rule"]}:{h["text"].strip()[:40]}' for h in gate["hits"]]
+                    if gate["gate"] == "block" and not force:
+                        save_queue(q)
+                        return self._json(409, {"error": "tells-gate blocked", "score": gate["score"],
+                                                "hits": gate["hits"], "rewrite": gate["rewrite"],
+                                                "hint": "edit the draft, or POST {\"force\": true} to approve anyway"})
                 it["status"] = "approved"
                 it["approved_at_et"] = t
                 it["intent_url"] = intent_url(it["text"], it.get("in_reply_to"))
             elif action == "skip":
+                if it["status"] not in ("draft", "approved", "cued"):
+                    return self._json(400, {"error": f"cannot skip from status={it['status']}"})
                 it["status"] = "skipped"
             elif action == "cue":
                 if it["status"] not in ("approved", "cued"):
@@ -792,7 +846,7 @@ class Handler(BaseHTTPRequestHandler):
                 it["cued_at_et"] = t
                 it["intent_url"] = intent_url(it["text"], it.get("in_reply_to"))
             elif action == "posted":
-                if it["status"] not in ("approved", "cued", "posted"):
+                if it["status"] not in ("cued", "posted"):
                     return self._json(400, {"error": f"cannot mark posted from status={it['status']}"})
                 it["status"] = "posted"
                 it["posted_at_et"] = t
