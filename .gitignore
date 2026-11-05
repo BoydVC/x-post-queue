@@ -8,3 +8,6 @@ secrets*
 vault*
 *.bak*
 *.zip
+data/
+server.log
+*.pid
