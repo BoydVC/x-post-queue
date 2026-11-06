@@ -65,7 +65,7 @@ Two **EXAMPLE** drafts ship in `data/queue.json` on first boot (clearly marked `
 ## Constraints
 
 - No auto-like / RT / DM / publish via API.
-- X Growth / TokenMax may create drafts and ping when due; Boyd always approves exact text and taps Post.
+- X Growth / TokenMax may create drafts and ping when due; Alex always approves exact text and taps Post.
 - Spec: `SPEC.md`.
 
 ## Smoke

@@ -2,7 +2,7 @@
 """X Post Queue — schedule/approve UI for @chrisalexboyd. Never auto-posts.
 
 Local LIVE on 0.0.0.0:4340. Persists data/queue.json. Intent links only;
-Boyd always taps Post on X.
+Alex always taps Post on X.
 """
 from __future__ import annotations
 
@@ -368,7 +368,7 @@ HTML = r"""<!DOCTYPE html>
           <option value="reply">Reply</option>
         </select>
         <label for="text">Exact post text</label>
-        <textarea id="text" maxlength="500" required placeholder="What Boyd will post…"></textarea>
+        <textarea id="text" maxlength="500" required placeholder="What Alex will post…"></textarea>
         <div class="char" id="charCount">0 / 280</div>
         <label for="reply">In reply to (post id, optional)</label>
         <input id="reply" placeholder="e.g. 1234567890123456789" />
